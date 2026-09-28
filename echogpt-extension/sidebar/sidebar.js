@@ -35,7 +35,9 @@ const els = {
   contextToggle: document.getElementById("contextToggle"),
   attach: document.getElementById("attach"),
   fileInput: document.getElementById("fileInput"),
-  attachments: document.getElementById("attachments")
+  attachments: document.getElementById("attachments"),
+  actionBadge: document.getElementById("actionBadge"),
+  actionBadgeLabel: document.getElementById("actionBadgeLabel")
 };
 
 let conversations = {};
@@ -770,22 +772,60 @@ els.newChat.addEventListener("click", () => {
   scheduleSave();
 });
 
-/* ================= Messages from popup ================= */
+/* ================= Incoming quick actions ================= */
 
-chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type !== "SIDEBAR_PROMPT") return;
-  if (status !== "idle") return;
+let actionTimer = null;
 
-  const prompt = message.payload?.prompt;
-  if (!prompt) return;
+function showActionBadge(label) {
+  clearTimeout(actionTimer);
+  els.actionBadgeLabel.textContent = label;
+  els.actionBadge.classList.remove("is-leaving");
+  els.actionBadge.hidden = false;
+}
 
-  if (message.payload?.command === "SUMMARIZE" || message.payload?.command === "SEARCH") {
-    includePageContext = true;
-    els.contextToggle.setAttribute("aria-pressed", "true");
+function clearActionBadge() {
+  els.actionBadge.classList.add("is-leaving");
+  setTimeout(() => {
+    els.actionBadge.hidden = true;
+    els.actionBadge.classList.remove("is-leaving");
+  }, 180);
+}
+
+function applyIncomingAction(payload) {
+  const prompt = (payload?.prompt || "").trim();
+  if (!prompt) return false;
+
+  if (status !== "idle") {
+    showActionBadge("Busy — try again");
+    clearActionBadge();
+    return false;
   }
 
-  send(prompt);
-  scheduleSave();
+  showActionBadge(payload.label || payload.action || "Quick Action");
+  els.input.value = prompt;
+  updateComposerState();
+
+  clearTimeout(actionTimer);
+  actionTimer = setTimeout(() => {
+    clearActionBadge();
+    send(prompt);
+  }, 300);
+
+  return true;
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "SIDEBAR_ACTION") {
+    applyIncomingAction(message.payload);
+    return false;
+  }
+
+  if (message?.type === "SIDEBAR_PROMPT") {
+    applyIncomingAction(message.payload);
+    return false;
+  }
+
+  return false;
 });
 
 /* ================= Init ================= */
@@ -796,6 +836,13 @@ async function init() {
   renderMessages();
   updateComposerState();
   scrollToBottom("auto");
+
+  // Tell the background we are alive so any queued action can be delivered.
+  try {
+    await chrome.runtime.sendMessage({ type: "SIDEBAR_READY" });
+  } catch {
+    /* background not ready */
+  }
 }
 
 init();

@@ -31,33 +31,13 @@ const EXTERNAL_LINKS = {
 };
 
 const QUICK_ACTIONS = {
-  summarize: {
-    label: "Summarize Page",
-    build: (context) => `Summarize this page in 5 bullet points:\n\n${context.pageText}`
-  },
-  explain: {
-    label: "Explain Selection",
-    build: (context) =>
-      context.selection
-        ? `Explain this clearly and simply:\n\n"${context.selection}"`
-        : "Explain the key idea of the current page in two short sentences."
-  },
-  rewrite: {
-    label: "Rewrite Text",
-    build: (context) =>
-      context.selection
-        ? `Rewrite this text to be clearer and more concise:\n\n"${context.selection}"`
-        : "Rewrite the main text of this page so it reads more clearly."
-  },
-  search: {
-    label: "Search with AI",
-    build: (context) =>
-      `Answer this using the current page as context:\n\n${context.pageText}`
-  }
+  summarize: { type: "SUMMARIZE_PAGE", label: "Summarize Page" },
+  explain: { type: "EXPLAIN_SELECTION", label: "Explain Selection" },
+  rewrite: { type: "REWRITE_TEXT", label: "Rewrite Text" },
+  search: { type: "SEARCH_WITH_AI", label: "Search with AI" }
 };
 
 let activeTabId = null;
-let lastSelection = "";
 
 /* ---------- Theme ---------- */
 
@@ -137,50 +117,34 @@ async function getActiveTab() {
   return tab ?? null;
 }
 
-async function getPageText() {
-  if (activeTabId === null) return "";
-  try {
-    const res = await chrome.tabs.sendMessage(activeTabId, { type: "GET_PAGE_TEXT" });
-    return res?.text || "";
-  } catch {
-    return "";
-  }
-}
-
-document.addEventListener("echogpt:selection", (event) => {
-  lastSelection = event.detail?.text || "";
-});
-
 /* ---------- Quick actions ---------- */
 
 async function runQuickAction(action) {
-  if (!(action in QUICK_ACTIONS)) return;
-
   const config = QUICK_ACTIONS[action];
-  const button = els.quickGrid.querySelector(`[data-action="${action}"]`);
+  if (!config) return;
 
-  if (button) {
-    button.disabled = true;
-    button.dataset.label = config.label;
-  }
+  const button = els.quickGrid.querySelector(`[data-action="${action}"]`);
+  if (button) button.disabled = true;
 
   try {
-    const pageText = await getPageText();
-    const prompt = config.build({ pageText, selection: lastSelection });
+    const tab = await getActiveTab();
+    if (tab?.id === undefined) return;
 
-    const opened = await openSidePanel();
-    if (!opened) return;
+    let response = null;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { type: config.type });
+    } catch {
+      response = { ok: false, error: "no-content-script" };
+    }
 
-    await chrome.runtime.sendMessage({
-      type: "SIDEBAR_PROMPT",
-      payload: { prompt, command: action.toUpperCase() }
-    });
+    // Content script refused (no selection, no permission on this page):
+    // it already explained why with a toast, so leave the popup open.
+    if (!response?.ok) return;
 
+    await openSidePanel();
     window.close();
   } finally {
-    if (button) {
-      button.disabled = false;
-    }
+    if (button) button.disabled = false;
   }
 }
 
@@ -233,13 +197,12 @@ function renderChats(history) {
 
     button.append(icon, title, time);
     button.addEventListener("click", async () => {
-      const opened = await openSidePanel();
-      if (!opened) return;
       await chrome.runtime.sendMessage({
-        type: "SIDEBAR_PROMPT",
-        payload: { prompt: entry.prompt || "", entryId: entry.id }
+        type: "NEW_CHAT",
+        payload: { prompt: entry.prompt || "", entryId: entry.id, label: "Recent Chat" }
       });
-      window.close();
+      const opened = await openSidePanel();
+      if (opened) window.close();
     });
 
     li.append(button);

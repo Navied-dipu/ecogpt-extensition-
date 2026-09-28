@@ -17,6 +17,86 @@ const MODEL_KEY_SLOT = {
   mistral: "mistral"
 };
 
+/* ================= Active tab context ================= */
+
+let activeTab = { windowId: null, tabId: null, url: null, title: null };
+
+function trackActiveTab(tab) {
+  if (!tab || tab.id === undefined || tab.windowId === undefined) return;
+  activeTab = {
+    windowId: tab.windowId,
+    tabId: tab.id,
+    url: tab.url || null,
+    title: tab.title || null
+  };
+  chrome.storage.session?.set({ activeTab }).catch(() => {});
+}
+
+chrome.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+  try {
+    trackActiveTab(await chrome.tabs.get(tabId));
+  } catch {
+    activeTab = { ...activeTab, windowId, tabId };
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (tab.active) trackActiveTab(tab);
+});
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, windowId });
+    trackActiveTab(tab);
+  } catch {
+    /* window may have closed */
+  }
+});
+
+/* ================= Side panel delivery queue ================= */
+
+let pendingAction = null;
+let deliverTimer = null;
+let sidebarReady = false;
+let delivering = false;
+
+function queueAction(payload) {
+  pendingAction = payload;
+  clearTimeout(deliverTimer);
+  deliverTimer = setTimeout(attemptDeliver, 200);
+  if (sidebarReady) attemptDeliver();
+}
+
+async function attemptDeliver() {
+  if (delivering || !pendingAction) return;
+
+  delivering = true;
+  const payload = pendingAction;
+
+  try {
+    await chrome.runtime.sendMessage({ type: "SIDEBAR_ACTION", payload });
+    // Only clear if nothing newer was queued while this send was in flight.
+    if (pendingAction === payload) pendingAction = null;
+  } catch {
+    // Sidebar is not open yet — keep it queued for SIDEBAR_READY.
+  } finally {
+    delivering = false;
+  }
+}
+
+async function openSidePanel(windowId) {
+  const target = windowId ?? activeTab.windowId;
+  if (target === null || target === undefined) return false;
+
+  try {
+    await chrome.sidePanel.open({ windowId: target });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.local.set({
     settings: {
@@ -26,16 +106,19 @@ chrome.runtime.onInstalled.addListener(async () => {
       sendOnSelect: true
     }
   });
-  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  await chrome.sidePanel.setPanelBehavior({ openPanelBehavior: "open" });
+});
+
+// Chrome only fires this while the manifest declares no default_popup.
+// With a popup configured the toolbar icon opens popup.html instead.
+chrome.action.onClicked.addListener((tab) => {
+  trackActiveTab(tab);
+  openSidePanel(tab?.windowId);
 });
 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "open-sidebar") return;
-
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.windowId !== undefined) {
-    await chrome.sidePanel.open({ windowId: tab.windowId });
-  }
+  await openSidePanel();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -46,8 +129,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch((err) => sendResponse({ error: err.message }));
       return true;
 
+    case "OPEN_SIDEBAR":
+      if (sender?.tab) trackActiveTab({ ...sender.tab, windowId: sender.tab.windowId });
+      openSidePanel(sender?.tab?.windowId)
+        .then((ok) => sendResponse({ ok }))
+        .catch(() => sendResponse({ ok: false }));
+      return true;
+
+    case "ACTION_PROMPT":
+      if (sender?.tab) {
+        activeTab = {
+          windowId: sender.tab.windowId,
+          tabId: sender.tab.id,
+          url: sender.tab.url || message.payload?.url || null,
+          title: message.payload?.pageTitle || null
+        };
+      }
+      queueAction(message.payload);
+      sendResponse({ ok: true });
+      return true;
+
+    case "SIDEBAR_READY":
+      sidebarReady = true;
+      attemptDeliver();
+      sendResponse({ ok: true, pending: Boolean(pendingAction) });
+      return true;
+
+    case "GET_ACTIVE_TAB":
+      sendResponse({ ok: true, activeTab });
+      return true;
+
     case "NEW_CHAT":
-      broadcastToSidebar(message.payload);
+      queueAction(message.payload);
       sendResponse({ ok: true });
       return true;
 
@@ -59,19 +172,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
-
-async function broadcastToSidebar(payload) {
-  const windows = await chrome.windows.getAll({ populate: true });
-  await Promise.all(
-    windows.flatMap((win) =>
-      (win.tabs || [])
-        .filter((tab) => tab.url?.startsWith(chrome.runtime.getURL("")))
-        .map((tab) =>
-          chrome.tabs.sendMessage(tab.id, { type: "SIDEBAR_PROMPT", payload }).catch(() => {})
-        )
-    )
-  );
-}
 
 async function handleChatRequest({ model, messages }) {
   const { settings } = await chrome.storage.local.get(SETTINGS_KEY);
