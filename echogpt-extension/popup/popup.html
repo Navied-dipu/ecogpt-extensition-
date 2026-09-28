@@ -8,39 +8,250 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="popup app-shell">
-      <header class="popup-header">
-        <div class="brand">
-          <span class="brand-logo">E</span>
-          <h1 class="brand-name">EchoGPT</h1>
+    <div class="popup">
+      <!-- ===== Header ===== -->
+      <header class="header">
+        <div class="header__left">
+          <span class="header__logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+              <path
+                d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4v-13.5Z"
+                fill="currentColor"
+                opacity=".95"
+              />
+              <path
+                d="M8.5 7.5h7M8.5 10.5h4.5"
+                stroke="#fff"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <span class="header__name">EchoGPT</span>
+          <span class="header__version">v2.0</span>
         </div>
-        <button id="themeToggle" class="btn btn-ghost icon-btn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+
+        <div class="header__actions">
+          <button
+            id="themeToggle"
+            class="icon-btn"
+            type="button"
+            title="Toggle theme"
+            aria-label="Toggle theme"
+          >
+            <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <circle cx="12" cy="12" r="4.2" fill="currentColor" />
+              <g stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2" />
+                <path d="M5.2 5.2 6.8 6.8M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6" />
+              </g>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <path
+                d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <button
+            id="openSettings"
+            class="icon-btn"
+            type="button"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <path
+                d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <path
+                d="M19.4 13.8a1.6 1.6 0 0 0 .3 1.8l.1.1a1.9 1.9 0 1 1-2.7 2.7l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.6 1.6 0 0 0-2.8-1.1l-.1.1a1.9 1.9 0 1 1-2.7-2.7l.1-.1a1.6 1.6 0 0 0-1.1-2.7h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.6 1.6 0 0 0 1.1-2.8l-.1-.1a1.9 1.9 0 1 1 2.7-2.7l.1.1a1.6 1.6 0 0 0 2.7-1.1v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.6 1.6 0 0 0 2.8 1.1l.1-.1a1.9 1.9 0 1 1 2.7 2.7l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.6 1.6 0 0 0-1.5 1Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
       </header>
 
-      <main class="popup-body">
-        <section class="card">
-          <h2 class="card-title">Open Sidebar</h2>
-          <p class="card-text">Chat with multiple AI models side by side while you browse.</p>
-          <button id="openSidebar" class="btn btn-primary full-width">Open Sidebar</button>
-        </section>
-
-        <section class="card">
-          <h2 class="card-title">New Chat</h2>
-          <textarea id="prompt" class="prompt-input" rows="3" placeholder="Ask anything..."></textarea>
-          <div class="model-row" id="modelRow"></div>
-          <button id="send" class="btn btn-primary full-width">Send to AI</button>
-        </section>
-
-        <section class="card">
-          <h2 class="card-title">Quick Links</h2>
-          <div class="link-grid">
-            <a class="btn btn-ghost" id="openHistory" href="#">History</a>
-            <a class="btn btn-ghost" id="openSettings" href="#">Settings</a>
+      <!-- ===== Scrollable body ===== -->
+      <main class="body" id="body">
+        <!-- User -->
+        <section class="section animate" style="--delay: 40ms" aria-label="Account">
+          <div class="user" id="userBlock" hidden>
+            <div class="user__avatar" id="userAvatar" aria-hidden="true"></div>
+            <div class="user__meta">
+              <p class="user__name" id="userName"></p>
+              <p class="user__email" id="userEmail"></p>
+            </div>
+            <span class="user__badge" id="userPlan">Free</span>
           </div>
+
+          <button id="signIn" class="signin" type="button">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">
+              <path
+                d="M14 3h4.5A2.5 2.5 0 0 1 21 5.5v13a2.5 2.5 0 0 1-2.5 2.5H14M10 16l-4-4 4-4M6 12h11"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Sign In to EchoGPT
+          </button>
+        </section>
+
+        <!-- Stats -->
+        <section class="section animate" style="--delay: 90ms" aria-label="Stats">
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__icon stat__icon--purple" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                  <rect
+                    x="3.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                  <rect
+                    x="13.5"
+                    y="3.5"
+                    width="7"
+                    height="7"
+                    rx="2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                  <rect
+                    x="3.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                  <rect
+                    x="13.5"
+                    y="13.5"
+                    width="7"
+                    height="7"
+                    rx="2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </span>
+              <span class="stat__value" id="statModels">5</span>
+              <span class="stat__label">Models</span>
+            </div>
+
+            <div class="stat">
+              <span class="stat__icon stat__icon--blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                  <path
+                    d="M20 11.5a7.5 7.5 0 1 1-3.2-6.1M20 4.5v4.2h-4.2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    transform="translate(0 2.5) scale(.9) translate(1.3 .6)"
+                  />
+                </svg>
+              </span>
+              <span class="stat__value">&infin;</span>
+              <span class="stat__label">Chats</span>
+            </div>
+
+            <div class="stat">
+              <span class="stat__icon stat__icon--green" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                  <path
+                    d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+              <span class="stat__value" id="statDelay">0ms</span>
+              <span class="stat__label">Delay</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Open sidebar -->
+        <section class="section animate" style="--delay: 140ms">
+          <button id="openSidebar" class="cta" type="button">
+            <span class="cta__shine" aria-hidden="true"></span>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+              <rect
+                x="3"
+                y="4"
+                width="18"
+                height="16"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path d="M14 4v16" stroke="currentColor" stroke-width="1.8" />
+            </svg>
+            <span>Open AI Sidebar</span>
+          </button>
+        </section>
+
+        <!-- Quick actions -->
+        <section class="section animate" style="--delay: 190ms" aria-label="Quick actions">
+          <h2 class="section__title">Quick Actions</h2>
+          <div class="quick-grid">
+            <button class="quick" type="button" data-action="summarize">
+              <span class="quick__icon" aria-hidden="true">📄</span>
+              <span class="quick__label">Summarize Page</span>
+            </button>
+            <button class="quick" type="button" data-action="explain">
+              <span class="quick__icon" aria-hidden="true">💡</span>
+              <span class="quick__label">Explain Selection</span>
+            </button>
+            <button class="quick" type="button" data-action="rewrite">
+              <span class="quick__icon" aria-hidden="true">✏️</span>
+              <span class="quick__label">Rewrite Text</span>
+            </button>
+            <button class="quick" type="button" data-action="search">
+              <span class="quick__icon" aria-hidden="true">🔍</span>
+              <span class="quick__label">Search with AI</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Recent chats -->
+        <section class="section animate" style="--delay: 240ms" aria-label="Recent chats">
+          <div class="section__head">
+            <h2 class="section__title">Recent Chats</h2>
+            <a class="link" id="viewAll" href="#">View All</a>
+          </div>
+          <ul class="chats" id="chats"></ul>
+          <p class="chats__empty" id="chatsEmpty">No conversations yet.</p>
         </section>
       </main>
 
-      <footer class="popup-footer text-muted">v2.0.0 &middot; Ctrl+Shift+E</footer>
+      <!-- ===== Footer ===== -->
+      <footer class="footer">
+        <p class="footer__shortcut">
+          Keyboard shortcut:
+          <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd>
+        </p>
+        <nav class="footer__links">
+          <a class="link" id="privacyLink" href="#">Privacy</a>
+          <span class="dot">·</span>
+          <a class="link" id="supportLink" href="#">Support</a>
+          <span class="dot">·</span>
+          <a class="link" id="rateLink" href="#">Rate Us</a>
+        </nav>
+      </footer>
     </div>
 
     <script src="popup.js"></script>

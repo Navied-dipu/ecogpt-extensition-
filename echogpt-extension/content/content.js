@@ -59,9 +59,31 @@
 
   document.addEventListener("mouseup", onSelectionChange);
 
-  chrome.runtime?.onMessage.addListener((message) => {
+  function getPageText() {
+    const root = document.querySelector("main, article, [role='main']") || document.body;
+    if (!root) return "";
+
+    const clone = root.cloneNode(true);
+    clone
+      .querySelectorAll("script, style, noscript, svg, nav, footer, aside, iframe")
+      .forEach((node) => node.remove());
+
+    return (clone.innerText || clone.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 6000);
+  }
+
+  chrome.runtime?.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type === "GET_PAGE_TEXT") {
+      sendResponse({ text: getPageText(), title: document.title, url: location.href });
+      return true;
+    }
+
     if (message?.type === "PING_FROM_SIDEBAR") {
       console.debug("[EchoGPT] content script ready");
     }
+
+    return false;
   });
 })();
