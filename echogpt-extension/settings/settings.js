@@ -9,13 +9,15 @@ const MODELS = [
 
 const SHORTCUTS = [
   { action: "Open Sidebar", keys: ["Ctrl", "Shift", "E"] },
-  { action: "New Chat", keys: ["Ctrl", "N"] },
-  { action: "Clear Chat", keys: ["Ctrl", "L"] },
+  { action: "Send Message", keys: ["Enter"] },
+  { action: "New Line", keys: ["Shift", "Enter"] },
   { action: "Focus Input", keys: ["/"] },
-  { action: "Toggle Theme", keys: ["Ctrl", "Shift", "D"] }
+  { action: "Toggle History", keys: ["Ctrl", "K"] },
+  { action: "Toggle Theme", keys: ["Ctrl", "Shift", "D"] },
+  { action: "Stop Generating", keys: ["Esc"] }
 ];
 
-const DEFAULT_ENDPOINT = "https://api.echogpt.app/v1/chat";
+const DEFAULT_ENDPOINT = "https://api.echogpt.live/v1/chat";
 const FONT_SIZES = ["small", "medium", "large"];
 const TEMPERATURE_LABELS = { "0.1": "Precise", "0.5": "Balanced", "1.0": "Creative" };
 const AVATAR_COLORS = ["#7c3aed", "#2563eb", "#0ea5e9", "#10b981", "#f97316", "#ec4899", "#ef4444"];

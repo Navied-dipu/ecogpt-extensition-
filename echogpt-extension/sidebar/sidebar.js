@@ -2213,6 +2213,42 @@ els.newChat.addEventListener("click", () => {
   toast("New chat started", "success");
 });
 
+/* ================= Keyboard ================= */
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    const field = event.target.closest?.("input, textarea, [contenteditable]");
+    if (!field || (field === els.input && !els.input.value)) {
+      event.preventDefault();
+      els.input.focus();
+      return;
+    }
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d") {
+    event.preventDefault();
+    els.themeToggle.click();
+    return;
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    setDrawer(!drawerOpen);
+    return;
+  }
+
+  if (event.key === "Escape") {
+    if (drawerOpen) {
+      setDrawer(false);
+      return;
+    }
+    if (status !== "idle") {
+      event.preventDefault();
+      stopGeneration();
+    }
+  }
+});
+
 /* ================= Incoming quick actions ================= */
 
 let actionTimer = null;
