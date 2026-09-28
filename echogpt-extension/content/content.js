@@ -108,7 +108,11 @@
   /* ================= Page / selection extraction ================= */
 
   function getPageText(limit = PAGE_TEXT_LIMIT) {
-    const raw = document.body?.innerText || "";
+    // Work on a clone so the injected trigger button never leaks into the context.
+    const clone = document.body?.cloneNode(true);
+    clone?.querySelector(`#${INLINE_TRIGGER_ID}`)?.remove();
+
+    const raw = clone?.innerText || "";
     return raw.replace(/\s+/g, " ").trim().slice(0, limit);
   }
 

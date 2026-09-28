@@ -915,33 +915,8 @@ body {
   display: block;
 }
 
-.sendbtn__spinner,
 .sendbtn__stop {
   display: none;
-}
-
-.sendbtn.is-loading {
-  cursor: progress;
-}
-
-.sendbtn.is-loading .sendbtn__send {
-  display: none;
-}
-
-.sendbtn.is-loading .sendbtn__spinner {
-  display: block;
-  width: 15px;
-  height: 15px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 700ms linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .sendbtn.is-streaming {
@@ -1244,35 +1219,6 @@ body {
   animation: logo-float 2s ease-in-out infinite;
 }
 
-/* ===== Auth toast ===== */
-.auth-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 50;
-  max-width: 84%;
-  padding: 9px 14px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #ffffff;
-  background: linear-gradient(120deg, #7c3aed, #2563eb);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-primary) 38%, transparent);
-  transform: translate(-50%, 12px);
-  opacity: 0;
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
-  pointer-events: none;
-}
-
-.auth-toast[hidden] {
-  display: none;
-}
-
-.auth-toast.is-visible {
-  transform: translate(-50%, 0);
-  opacity: 1;
-}
-
 /* ===== Scrollbars ===== */
 .messages::-webkit-scrollbar {
   width: 7px;
@@ -1291,9 +1237,365 @@ body {
   background-color: var(--text-muted);
 }
 
+/* ==========================================================================
+   Polish: micro-interactions, skeletons, history drawer
+   ========================================================================== */
+
+/* -- Every button presses down slightly -- */
+.hdr .icon-btn,
+.modelbar .mtab,
+.empty .chip,
+.msg__actions .act,
+.composer .pill,
+.composer .icon-btn,
+.sendbtn,
+.auth-google,
+.auth-submit,
+.auth-link,
+.drawer__close,
+.drawer__item,
+.skeleton-card {
+  transition: transform var(--press), background-color var(--transition),
+    color var(--transition), border-color var(--transition), box-shadow var(--transition),
+    filter var(--transition);
+}
+
+.hdr .icon-btn:active,
+.modelbar .mtab:active,
+.empty .chip:active,
+.msg__actions .act:active,
+.composer .pill:active,
+.composer .icon-btn:active,
+.sendbtn:active,
+.auth-google:active,
+.auth-submit:active,
+.auth-link:active,
+.drawer__close:active,
+.drawer__item:active {
+  transform: scale(0.97);
+}
+
+/* Keep toasts clear of the composer while staying bottom-right. */
+.toast-host {
+  bottom: 128px;
+}
+
+/* -- Header gains elevation once the message list scrolls -- */
+.hdr {
+  transition: box-shadow 240ms ease, background-color var(--theme-transition),
+    color var(--theme-transition);
+}
+
+.hdr.is-scrolled {
+  box-shadow: 0 4px 16px -6px var(--shadow-color), 0 1px 0 var(--border-color);
+}
+
+/* -- Message bubbles lift on hover -- */
+.msg {
+  transition: transform 200ms var(--ease-out);
+}
+
+.msg:hover {
+  transform: translateY(-1px);
+}
+
+.msg--user {
+  align-self: flex-end;
+}
+
+.msg__bubble--user,
+.msg__bubble--ai {
+  transition: background-color var(--theme-transition), color var(--theme-transition),
+    border-color var(--theme-transition), box-shadow 220ms ease;
+}
+
+.msg:hover .msg__bubble--ai {
+  box-shadow: 0 6px 18px -8px var(--shadow-color);
+}
+
+.msg:hover .msg__bubble--user {
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--accent-primary) 42%, transparent);
+}
+
+/* -- Model tabs: sliding underline + glow -- */
+.modelbar__indicator {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+
+.mtab::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  height: 1.5px;
+  border-radius: 2px;
+  background-color: currentColor;
+  opacity: 0;
+  transform: scaleX(0.3);
+  transition: opacity 200ms ease, transform 260ms var(--ease-out);
+}
+
+.mtab:hover::after,
+.mtab[aria-selected="true"]::after {
+  opacity: 0.55;
+  transform: scaleX(1);
+}
+
+/* -- Composer input focus glow -- */
+.composer__input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent),
+    0 4px 14px -8px var(--shadow-color);
+}
+
+/* -- Send button ripple host -- */
+.sendbtn {
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sendbtn .ripple {
+  z-index: -1;
+}
+
+.sendbtn__send,
+.sendbtn__stop {
+  transition: opacity 160ms ease, transform 200ms var(--ease-out);
+}
+
+/* -- Header icons rotate when the drawer toggles -- */
+.hdr__actions .icon-btn svg,
+.hdr__brand .hdr__logo svg {
+  transition: transform 320ms var(--ease-out);
+}
+
+.icon-btn.is-flipped svg {
+  transform: rotate(180deg);
+}
+
+/* -- Theme toggle icon swap animation -- */
+.icon-sun,
+.icon-moon {
+  transition: transform 420ms var(--ease-out), opacity 200ms ease;
+}
+
+:root[data-theme="dark"] .icon-sun {
+  display: none;
+}
+
+:root[data-theme="dark"] .icon-moon {
+  display: block;
+  animation: spin 360ms var(--ease-out);
+}
+
+/* -- Typing dots use the shared dotBounce keyframe -- */
+.typing__dots i {
+  animation: dotBounce 1.15s infinite ease-in-out;
+}
+
+.typing__dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing__dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* -- Streaming cursor uses the shared blink keyframe -- */
+.msg__cursor {
+  animation: blink 1s steps(2, start) infinite;
+}
+
+/* -- Loading skeletons -- */
+.messages .skeleton-bubble {
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skeleton-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  animation: slideUp 360ms var(--ease-out) both;
+}
+
+.skeleton-row--user {
+  align-items: flex-end;
+}
+
+/* ==========================================================================
+   History drawer (slides in from the right)
+   ========================================================================== */
+
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background-color: color-mix(in srgb, var(--bg-primary) 55%, transparent);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 200ms ease both;
+}
+
+.drawer-backdrop[hidden] {
+  display: none;
+}
+
+.drawer-backdrop.is-leaving {
+  animation: fadeIn 200ms ease reverse both;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 92%);
+  border-left: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  box-shadow: -12px 0 32px -18px var(--shadow-color);
+  animation: slideInRight 300ms var(--ease-out) both;
+}
+
+.drawer[hidden] {
+  display: none;
+}
+
+.drawer.is-leaving {
+  animation: slideOutRight 240ms ease-in both;
+}
+
+.drawer__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.drawer__title {
+  font-size: 13px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.drawer__search {
+  padding: 7px 9px;
+  margin: 10px 12px;
+  font-size: 12px;
+  background-color: var(--bg-primary);
+}
+
+.drawer__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  text-align: left;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  animation: slideUp 300ms var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.drawer__item:hover {
+  border-color: var(--accent-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.drawer__item.is-active {
+  border-color: var(--accent-primary);
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+}
+
+.drawer__item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer__item-title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer__item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.drawer__item-del {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: color var(--transition), background-color var(--transition),
+    transform var(--press);
+}
+
+.drawer__item-del:hover {
+  color: var(--accent-danger);
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+.drawer__item-del:active {
+  transform: scale(0.88);
+}
+
+.drawer__empty {
+  padding: 24px 8px;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--text-muted);
+  animation: slideUp 320ms var(--ease-out) both;
+}
+
+.drawer__foot {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+  text-align: center;
+}
+
+.drawer__foot button {
+  color: var(--accent-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.drawer__foot button:hover {
+  text-decoration: underline;
+}
+
 /* ===== Dark tweaks ===== */
 :root[data-theme="dark"] .msg__bubble--ai {
   background-color: var(--bg-tertiary);
+}
+
+:root[data-theme="dark"] .drawer {
+  box-shadow: -12px 0 32px -12px rgba(0, 0, 0, 0.6);
 }
 
 /* ===== Animations off ===== */

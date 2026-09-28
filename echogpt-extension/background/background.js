@@ -106,6 +106,14 @@ chrome.runtime.onInstalled.addListener(async () => {
       sendOnSelect: true
     }
   });
+
+  // Seed the synced theme once so every page resolves prefers-color-scheme the
+  // same way from the very first launch.
+  const { appearance = {} } = await chrome.storage.sync.get(["appearance"]);
+  if (!appearance.theme) {
+    await chrome.storage.sync.set({ appearance: { ...appearance, theme: "system" } });
+  }
+
   await chrome.sidePanel.setPanelBehavior({ openPanelBehavior: "open" });
 });
 

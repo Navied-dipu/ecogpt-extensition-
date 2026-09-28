@@ -42,7 +42,7 @@
               <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
           </button>
-          <button id="openHistory" class="icon-btn" type="button" title="History" aria-label="History">
+          <button id="openHistory" class="icon-btn" type="button" title="History" aria-label="History" aria-expanded="false" aria-controls="historyDrawer">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
               <path
                 d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 5v4.2h4.2"
@@ -173,16 +173,51 @@
             <svg class="sendbtn__send" viewBox="0 0 24 24" width="17" height="17" fill="none">
               <path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            <span class="sendbtn__spinner" aria-hidden="true"></span>
             <span class="sendbtn__stop" aria-hidden="true"></span>
           </button>
         </div>
 
         <p class="composer__hint">Enter to send &middot; Shift+Enter for new line</p>
       </footer>
+
+      <!-- ===== History drawer ===== -->
+      <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+      <aside
+        class="drawer"
+        id="historyDrawer"
+        hidden
+        aria-label="Conversation history"
+        aria-hidden="true"
+      >
+        <div class="drawer__head">
+          <h2 class="drawer__title">History</h2>
+          <button class="icon-btn" id="drawerClose" type="button" title="Close history" aria-label="Close history">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+              <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <input
+          class="drawer__search"
+          id="drawerSearch"
+          type="search"
+          placeholder="Search conversations..."
+          aria-label="Search conversations"
+        />
+
+        <div class="drawer__list" id="drawerList"></div>
+
+        <div class="drawer__foot">
+          <button id="drawerAll" type="button">Open full History page &rarr;</button>
+        </div>
+      </aside>
     </div>
 
-    <!-- Sign-in overlay and toast are injected by sidebar.js -->
+    <!-- Toasts (fixed bottom-right, clear of the composer) -->
+    <div class="toast-host" id="toastHost" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- Sign-in overlay is injected by sidebar.js -->
 
     <script src="sidebar.js"></script>
   </body>

@@ -12,16 +12,33 @@
       <header class="history-header">
         <h1>History</h1>
         <div class="header-actions">
-          <input id="search" class="search-input" type="search" placeholder="Search..." />
-          <button id="clearAll" class="btn btn-ghost">Clear</button>
+          <input id="search" class="search-input" type="search" placeholder="Search..." aria-label="Search history" />
+          <button id="clearAll" class="btn btn-ghost" type="button">Clear</button>
         </div>
       </header>
 
       <main class="history-body">
-        <p id="empty" class="empty text-muted">No conversations yet.</p>
+        <div class="skeleton-list" id="skeletonList" aria-hidden="true">
+          <div class="skeleton-card">
+            <span class="skeleton skeleton-line" style="width: 70%"></span>
+            <span class="skeleton skeleton-line skeleton-line--short"></span>
+          </div>
+          <div class="skeleton-card">
+            <span class="skeleton skeleton-line" style="width: 55%"></span>
+            <span class="skeleton skeleton-line skeleton-line--mid"></span>
+          </div>
+          <div class="skeleton-card">
+            <span class="skeleton skeleton-line" style="width: 80%"></span>
+            <span class="skeleton skeleton-line skeleton-line--short"></span>
+          </div>
+        </div>
+
+        <p id="empty" class="empty text-muted" hidden>No conversations yet.</p>
         <ul id="list" class="history-list"></ul>
       </main>
     </div>
+
+    <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
     <script src="history.js"></script>
   </body>

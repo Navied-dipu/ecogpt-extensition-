@@ -1,4 +1,12 @@
+/* ==========================================================================
+   EchoGPT — shared foundation: theme tokens, resets, animation library,
+   micro-interaction primitives, skeletons and the toast system.
+   Loaded by every extension page before its own stylesheet.
+   ========================================================================== */
+
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* ---------- Theme tokens ---------- */
 
 :root {
   --bg-primary: #ffffff;
@@ -9,15 +17,26 @@
   --text-muted: #6b6b80;
   --accent-primary: #7c3aed;
   --accent-secondary: #2563eb;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #dc2626;
+  --accent-info: #3b82f6;
   --border-color: #e2e2ec;
   --shadow-color: rgba(20, 20, 31, 0.12);
+  --skeleton-base: #ececf3;
+  --skeleton-sheen: rgba(255, 255, 255, 0.85);
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+
   --transition: 180ms ease;
+  --theme-transition: 200ms ease;
+  --press: 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root[data-theme="dark"] {
@@ -31,14 +50,20 @@
   --accent-secondary: #60a5fa;
   --border-color: #2a2a3a;
   --shadow-color: rgba(0, 0, 0, 0.5);
+  --skeleton-base: #21212f;
+  --skeleton-sheen: rgba(255, 255, 255, 0.07);
 }
 
+/* Theme switches animate color surfaces without touching layout properties. */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  transition-property: background-color, color, border-color, fill, stroke;
+  transition-duration: var(--theme-transition);
+  transition-timing-function: ease;
 }
 
 html,
@@ -53,9 +78,9 @@ body {
   color: var(--text-primary);
   background-color: var(--bg-primary);
   -webkit-font-smoothing: antialiased;
-  transition: background-color var(--transition), color var(--transition);
 }
 
+/* Components re-declare their own transitions after this rule. */
 h1,
 h2,
 h3,
@@ -67,6 +92,7 @@ h4 {
 a {
   color: var(--accent-secondary);
   text-decoration: none;
+  transition: color var(--transition), opacity var(--transition);
 }
 
 a:hover {
@@ -86,6 +112,8 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+  transition: transform var(--press), background-color var(--transition),
+    color var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
 button:disabled {
@@ -96,11 +124,12 @@ button:disabled {
 input,
 textarea,
 select {
+  padding: 8px 10px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  transition: border-color var(--transition), background-color var(--transition);
+  transition: border-color var(--transition), background-color var(--transition),
+    box-shadow var(--transition), transform var(--press);
 }
 
 input:focus,
@@ -108,6 +137,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 22%, transparent);
 }
 
 textarea {
@@ -124,6 +154,442 @@ ul,
 ol {
   list-style: none;
 }
+
+::selection {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- Animation library ---------- */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -220% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes dotBounce {
+  0%,
+  70%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------- Layout helpers ---------- */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color var(--theme-transition), color var(--theme-transition);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Staggered entrance helper: set --delay per element. */
+.animate {
+  animation: slideUp 460ms var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.animate-bounce {
+  animation: bounceIn 420ms var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: transform var(--press), background-color var(--transition),
+    color var(--transition), box-shadow var(--transition), opacity var(--transition);
+}
+
+.btn:hover {
+  background-color: var(--border-color);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: linear-gradient(120deg, var(--accent-primary), var(--accent-secondary));
+  color: #ffffff;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.06);
+  background: linear-gradient(120deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Pressable surface used by cards, chips and tiles. */
+.pressable {
+  transition: transform var(--press), background-color var(--transition),
+    border-color var(--transition), box-shadow var(--transition), color var(--transition);
+}
+
+.pressable:hover {
+  transform: translateY(-1px);
+}
+
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Icons that flip 180° when their panel or theme toggles. */
+.icon-flip {
+  transition: transform 260ms var(--ease-out), opacity var(--transition);
+}
+
+.icon-flip.is-flipped {
+  transform: rotate(180deg);
+}
+
+/* ---------- Ripple ---------- */
+
+.ripple-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: currentColor;
+  opacity: 0.28;
+  transform: translate(-50%, -50%) scale(0);
+  animation: rippleOut 560ms ease-out forwards;
+}
+
+@keyframes rippleOut {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ---------- Loading skeletons ---------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-sheen) 50%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skeleton-line {
+  height: 10px;
+  margin: 6px 0;
+}
+
+.skeleton-line--short {
+  width: 45%;
+}
+
+.skeleton-line--mid {
+  width: 70%;
+}
+
+.skeleton-bubble {
+  width: 78%;
+  height: 44px;
+  border-radius: 14px;
+}
+
+.skeleton-bubble--user {
+  align-self: flex-end;
+  border-radius: 14px 14px 4px 14px;
+  background: linear-gradient(120deg, #7c3aed33, #2563eb33);
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+}
+
+/* ---------- Toasts ---------- */
+
+.toast-host {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: min(300px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+/* Scoped to .toast-host so pages with their own single-toast component
+   (Settings) keep their styling untouched. */
+
+.toast-host .toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--toast-accent, var(--accent-primary));
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 10px 28px var(--shadow-color);
+  pointer-events: auto;
+  animation: slideInRight 320ms var(--ease-out) both;
+}
+
+.toast-host .toast.is-leaving {
+  animation: slideOutRight 240ms ease-in both;
+}
+
+.toast-host .toast__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  color: var(--toast-accent, var(--accent-primary));
+}
+
+.toast-host .toast__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-host .toast__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  background-color: transparent;
+  transition: color var(--transition), background-color var(--transition),
+    transform var(--press);
+}
+
+.toast-host .toast__close:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.toast-host .toast__close:active {
+  transform: scale(0.9);
+}
+
+.toast-host .toast--success {
+  --toast-accent: var(--accent-success);
+}
+
+.toast-host .toast--error {
+  --toast-accent: var(--accent-danger);
+}
+
+.toast-host .toast--info {
+  --toast-accent: var(--accent-info);
+}
+
+.toast-host .toast--warning {
+  --toast-accent: var(--accent-warning);
+}
+
+.toast-host .toast--primary {
+  --toast-accent: var(--accent-primary);
+}
+
+/* ---------- Spinner ---------- */
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+/* ---------- Scrollbars ---------- */
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -144,75 +610,12 @@ ol {
   background-color: var(--text-muted);
 }
 
-::selection {
-  background-color: var(--accent-primary);
-  color: #ffffff;
-}
-
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  transition: background-color var(--transition), color var(--transition), transform 100ms ease;
-}
-
-.btn:hover {
-  background-color: var(--border-color);
-}
-
-.btn:active {
-  transform: scale(0.97);
-}
-
-.btn-primary {
-  background-color: var(--accent-primary);
-  color: #ffffff;
-}
-
-.btn-primary:hover {
-  background-color: var(--accent-secondary);
-}
-
-.btn-ghost {
-  background-color: transparent;
-  color: var(--text-secondary);
-}
-
-.btn-ghost:hover {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.text-muted {
-  color: var(--text-muted);
-}
-
-.text-secondary {
-  color: var(--text-secondary);
-}
-
-.hidden {
-  display: none !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    transition: none !important;
     animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

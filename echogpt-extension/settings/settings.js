@@ -106,6 +106,16 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (state.appearance.theme === "system") applyTheme("system");
 });
 
+/* The sidebar and popup write the synced theme; follow it without a reload. */
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync" || !changes.appearance) return;
+
+  const theme = changes.appearance.newValue?.theme || "system";
+  state.appearance.theme = theme;
+  applyTheme(theme);
+  renderAppearance();
+});
+
 /* ================= Toast ================= */
 
 const ICONS = {

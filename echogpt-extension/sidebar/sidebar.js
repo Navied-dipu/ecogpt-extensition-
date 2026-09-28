@@ -63,7 +63,15 @@ const els = {
   attachments: document.getElementById("attachments"),
   actionBadge: document.getElementById("actionBadge"),
   actionBadgeLabel: document.getElementById("actionBadgeLabel"),
-  tokenCounter: document.getElementById("tokenCounter")
+  tokenCounter: document.getElementById("tokenCounter"),
+  header: document.querySelector(".hdr"),
+  toastHost: document.getElementById("toastHost"),
+  drawer: document.getElementById("historyDrawer"),
+  drawerBackdrop: document.getElementById("drawerBackdrop"),
+  drawerClose: document.getElementById("drawerClose"),
+  drawerSearch: document.getElementById("drawerSearch"),
+  drawerList: document.getElementById("drawerList"),
+  drawerAll: document.getElementById("drawerAll")
 };
 
 let conversations = {};
@@ -329,13 +337,7 @@ function injectAuthUi() {
       </div>
     </div>`;
 
-  const toast = document.createElement("div");
-  toast.className = "auth-toast";
-  toast.id = "authToast";
-  toast.setAttribute("role", "status");
-  toast.hidden = true;
-
-  document.body.append(overlay, toast);
+  document.body.append(overlay);
 
   auth.root = overlay;
   auth.card = overlay.querySelector(".auth-card");
@@ -345,7 +347,6 @@ function injectAuthUi() {
   auth.submit = overlay.querySelector("#authSubmit");
   auth.google = overlay.querySelector("#authGoogle");
   auth.loading = overlay.querySelector("#authLoading");
-  auth.toast = toast;
 
   auth.google.addEventListener("click", signInWithGoogle);
   auth.form.addEventListener("submit", (event) => {
@@ -397,24 +398,6 @@ function setAuthOverlay(visible, animate = true) {
     auth.root.hidden = true;
     auth.root.classList.remove("is-leaving");
   }, OVERLAY_FADE_MS);
-}
-
-/**
- * Show a transient toast in the sidebar.
- * @param {string} text - The message to show
- */
-function showAuthToast(text) {
-  if (!auth.toast) return;
-
-  clearTimeout(auth.toastTimer);
-  auth.toast.textContent = text;
-  auth.toast.hidden = false;
-  auth.toast.classList.add("is-visible");
-
-  auth.toastTimer = setTimeout(() => {
-    auth.toast.classList.remove("is-visible");
-    auth.toast.hidden = true;
-  }, 3200);
 }
 
 /**
@@ -610,7 +593,7 @@ async function handleAuthSuccess(user) {
 
   setAuthOverlay(false);
   updateSignInState();
-  showAuthToast(`Welcome back, ${displayName(user)}! 👋`);
+  toast(`Welcome back, ${displayName(user)}! 👋`, "primary");
 }
 
 /**
@@ -698,7 +681,7 @@ async function loadState() {
     activeId = conversation.id;
   }
 
-  applyTheme(stored[KEY.theme] || "system");
+  applyTheme(await readTheme());
   els.contextToggle.setAttribute("aria-pressed", String(includePageContext));
   els.chatTitle.textContent = activeConversation().title;
 
@@ -772,15 +755,131 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = resolveTheme(theme);
 }
 
+/**
+ * Read the theme from chrome.storage.sync, falling back to the local mirror.
+ * @returns {Promise<string>} "light", "dark" or "system"
+ */
+async function readTheme() {
+  const [synced, local] = await Promise.all([
+    chrome.storage.sync.get(["appearance"]),
+    chrome.storage.local.get([KEY.theme])
+  ]);
+
+  return synced.appearance?.theme || local[KEY.theme] || "system";
+}
+
+/**
+ * Persist a theme choice to sync and to the local mirror other pages read.
+ * @param {string} theme - "light" or "dark"
+ */
+async function saveTheme(theme) {
+  applyTheme(theme);
+
+  // Merge so the other synced appearance preferences are preserved.
+  const { appearance = {} } = await chrome.storage.sync.get(["appearance"]);
+  await Promise.all([
+    chrome.storage.sync.set({ appearance: { ...appearance, theme } }),
+    chrome.storage.local.set({ [KEY.theme]: theme })
+  ]);
+}
+
 els.themeToggle.addEventListener("click", async () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(next);
-  await chrome.storage.local.set({ [KEY.theme]: next });
+  await saveTheme(next);
+  toast(`Switched to ${next} mode`, "info");
 });
 
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   applyTheme(document.documentElement.dataset.theme);
 });
+
+/* ================= Toasts ================= */
+
+const TOAST_ICONS = {
+  success:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19Z" fill="currentColor" opacity=".18"/><path d="m8 12.4 2.6 2.6L16 9.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  error:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19Z" fill="currentColor" opacity=".18"/><path d="M12 7.5v5.2M12 16.4v.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v5.2M12 7.8v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  warning:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 3.4 21 19.6H3L12 3.4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9.6v4M12 16.2v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  primary: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4v-13.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'
+};
+
+const TOAST_DURATION_MS = 3000;
+
+/**
+ * Push a toast onto the shared stack.
+ * @param {string} message - The text to show
+ * @param {"success"|"error"|"info"|"warning"|"primary"} [type] - Toast variant
+ * @param {{timeout?: number}} [options] - Auto-dismiss delay in ms
+ * @returns {HTMLElement|null} The toast element, or null when no host exists
+ */
+function toast(message, type = "info", { timeout = TOAST_DURATION_MS } = {}) {
+  if (!els.toastHost) return null;
+
+  const node = document.createElement("div");
+  node.className = `toast toast--${type}`;
+  node.setAttribute("role", type === "error" ? "alert" : "status");
+
+  const icon = document.createElement("span");
+  icon.className = "toast__icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+
+  const text = document.createElement("span");
+  text.className = "toast__text";
+  text.textContent = message;
+
+  const close = document.createElement("button");
+  close.className = "toast__close";
+  close.type = "button";
+  close.title = "Dismiss";
+  close.setAttribute("aria-label", "Dismiss notification");
+  close.textContent = "×";
+  close.addEventListener("click", () => dismissToast(node));
+
+  node.append(icon, text, close);
+  els.toastHost.append(node);
+
+  node.timer = setTimeout(() => dismissToast(node), timeout);
+  while (els.toastHost.children.length > 4) dismissToast(els.toastHost.firstElementChild);
+  return node;
+}
+
+/**
+ * Slide a toast out and remove it.
+ * @param {HTMLElement} node - The toast element
+ */
+function dismissToast(node) {
+  if (!node || node.classList.contains("is-leaving")) return;
+  clearTimeout(node.timer);
+  node.classList.add("is-leaving");
+  node.addEventListener("animationend", () => node.remove(), { once: true });
+  setTimeout(() => node.remove(), 400);
+}
+
+/**
+ * Spawn a ripple inside a pressable element.
+ * @param {HTMLElement} host - The element to ripple
+ * @param {MouseEvent} event - The originating pointer event
+ */
+function spawnRipple(host, event) {
+  if (!host) return;
+
+  const rect = host.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 2.2;
+  const ripple = document.createElement("span");
+
+  ripple.className = "ripple";
+  ripple.style.width = `${size}px`;
+  ripple.style.height = `${size}px`;
+  ripple.style.left = `${(event.clientX ?? rect.width / 2) - rect.left}px`;
+  ripple.style.top = `${(event.clientY ?? rect.height / 2) - rect.top}px`;
+
+  host.append(ripple);
+  ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+}
 
 /* ================= Markdown ================= */
 
@@ -870,13 +969,14 @@ function scrollToBottom(behavior = "smooth") {
 }
 
 /**
- * Update the scroll-to-bottom FAB visibility based on scroll position.
+ * Update the scroll-to-bottom FAB visibility and the header elevation.
  */
 function updateFab() {
   const distance =
     els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight;
   stickToBottom = distance <= NEAR_BOTTOM;
   els.scrollFab.hidden = stickToBottom;
+  els.header?.classList.toggle("is-scrolled", els.messages.scrollTop > 4);
 }
 
 els.messages.addEventListener("scroll", updateFab, { passive: true });
@@ -965,10 +1065,12 @@ function moveIndicator() {
  * @param {string} id - Model ID
  */
 function setModel(id) {
+  if (id === activeModel) return;
   activeModel = id;
   activeConversation().model = id;
   renderModelBar();
   scheduleSave();
+  toast(`Switched to ${modelById(id).label}`, "info");
 }
 
 window.addEventListener("resize", moveIndicator);
@@ -1395,6 +1497,7 @@ function createMessageNode(msg) {
     await copyText(msg.text);
     copy.textContent = "✅";
     setTimeout(() => (copy.textContent = "📋"), 1200);
+    toast("Reply copied to clipboard", "success");
   });
 
   node.append(head, bubble, actions);
@@ -1551,6 +1654,7 @@ function showErrorCard(record, error) {
   else els.messages.append(next);
 
   if (stickToBottom) els.messages.scrollTop = els.messages.scrollHeight;
+  toast(ERROR_TITLE[error.kind] || ERROR_TITLE.unknown, error.kind === "timeout" ? "warning" : "error");
 }
 
 /**
@@ -1640,6 +1744,7 @@ async function discardAndResend(message) {
 
   conversation.messages.splice(index, 1);
   renderMessages();
+  toast("Regenerating response...", "info");
   await runCompletion();
 }
 
@@ -1683,13 +1788,13 @@ async function send(rawText) {
 
 /**
  * Update the send button for the current status and auth state.
+ * Any in-flight request (waiting for the first token or streaming) offers Stop.
  */
 function updateSendState() {
-  const hasText = els.input.value.trim().length > 0;
-  els.send.disabled = status === "idle" ? !hasText || !signedIn : false;
-  els.send.classList.toggle("is-loading", status === "loading");
-  els.send.classList.toggle("is-streaming", status === "streaming");
-  els.send.setAttribute("aria-label", status === "idle" ? "Send message" : "Stop generating");
+  const busy = status !== "idle";
+  els.send.disabled = busy ? false : els.input.value.trim().length === 0 || !signedIn;
+  els.send.classList.toggle("is-streaming", busy);
+  els.send.setAttribute("aria-label", busy ? "Stop generating" : "Send message");
 }
 
 /**
@@ -1701,7 +1806,8 @@ function setStatus(next) {
   updateSendState();
 }
 
-els.send.addEventListener("click", () => {
+els.send.addEventListener("click", (event) => {
+  spawnRipple(els.send, event);
   if (status === "idle") send();
   else stopGeneration();
 });
@@ -1774,6 +1880,7 @@ els.contextToggle.addEventListener("click", () => {
   includePageContext = !includePageContext;
   els.contextToggle.setAttribute("aria-pressed", String(includePageContext));
   scheduleSave();
+  toast(includePageContext ? "Page context included" : "Page context removed", "info");
 });
 
 /* ================= Attachments ================= */
@@ -1822,6 +1929,9 @@ els.fileInput.addEventListener("change", async () => {
 
   els.fileInput.value = "";
   renderAttachments();
+  if (attachments.length) {
+    toast(`${attachments.length} file${attachments.length === 1 ? "" : "s"} attached`, "success");
+  }
 });
 
 /* ================= Empty state ================= */
@@ -1855,6 +1965,225 @@ els.chatTitle.addEventListener("blur", () => {
   persistConversation(activeConversation());
 });
 
+/* ================= History drawer ================= */
+
+let drawerOpen = false;
+
+/**
+ * Format a timestamp as a short relative string.
+ * @param {number} ts - Timestamp in milliseconds
+ * @returns {string} e.g. "now", "12m ago", "3h ago", "2d ago"
+ */
+function relativeTime(ts) {
+  const mins = Math.floor((Date.now() - (ts || Date.now())) / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Show or hide the history drawer with a slide animation.
+ * @param {boolean} open - Target state
+ * @param {boolean} [animate] - Play the slide-out animation when closing
+ */
+function setDrawer(open, animate = true) {
+  if (!els.drawer) return;
+
+  drawerOpen = open;
+  els.openHistory.classList.toggle("is-flipped", open);
+  els.openHistory.setAttribute("aria-expanded", String(open));
+
+  if (open) {
+    els.drawer.hidden = false;
+    els.drawerBackdrop.hidden = false;
+    els.drawer.classList.remove("is-leaving");
+    els.drawerBackdrop.classList.remove("is-leaving");
+    renderDrawer();
+    return;
+  }
+
+  if (!animate) {
+    els.drawer.hidden = true;
+    els.drawerBackdrop.hidden = true;
+    return;
+  }
+
+  els.drawer.classList.add("is-leaving");
+  els.drawerBackdrop.classList.add("is-leaving");
+  setTimeout(() => {
+    els.drawer.hidden = true;
+    els.drawerBackdrop.hidden = true;
+    els.drawer.classList.remove("is-leaving");
+    els.drawerBackdrop.classList.remove("is-leaving");
+  }, 240);
+}
+
+/**
+ * Render three shimmer placeholders while the history index loads.
+ */
+function showDrawerSkeleton() {
+  els.drawerList.replaceChildren();
+
+  for (let i = 0; i < 3; i++) {
+    const card = document.createElement("div");
+    card.className = "skeleton-card";
+    card.style.setProperty("--delay", `${i * 90}ms`);
+    card.innerHTML =
+      '<span class="skeleton skeleton-line" style="width:70%"></span>' +
+      '<span class="skeleton skeleton-line skeleton-line--short"></span>';
+    els.drawerList.append(card);
+  }
+}
+
+/**
+ * Collect every stored conversation, newest first.
+ * @returns {Promise<Array<Object>>} Conversation summaries
+ */
+async function loadConversationIndex() {
+  const stored = await chrome.storage.local.get(null);
+  const index = new Map();
+
+  for (const [key, value] of Object.entries(stored)) {
+    if (key.startsWith("conversation_") && value?.id) index.set(value.id, value);
+  }
+  for (const conversation of Object.values(conversations)) {
+    index.set(conversation.id, conversation);
+  }
+
+  return [...index.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+/**
+ * Render the drawer list from storage, filtered by the search box.
+ * @param {string} [query] - Optional search text
+ * @returns {Promise<void>} Resolves once the list is rendered
+ */
+async function renderDrawer(query = "") {
+  showDrawerSkeleton();
+
+  const all = await loadConversationIndex();
+  const needle = query.trim().toLowerCase();
+  const items = needle
+    ? all.filter((item) => String(item.title || "").toLowerCase().includes(needle))
+    : all;
+
+  els.drawerList.replaceChildren();
+
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "drawer__empty";
+    empty.textContent = all.length ? "No conversations match your search." : "No conversations yet.";
+    els.drawerList.append(empty);
+    return;
+  }
+
+  items.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "drawer__item";
+    button.style.setProperty("--delay", `${Math.min(index, 8) * 45}ms`);
+    if (item.id === activeId) button.classList.add("is-active");
+
+    const body = document.createElement("span");
+    body.className = "drawer__item-body";
+
+    const title = document.createElement("span");
+    title.className = "drawer__item-title";
+    title.textContent = item.title || "Untitled chat";
+
+    const meta = document.createElement("span");
+    meta.className = "drawer__item-meta";
+    meta.textContent = `${relativeTime(item.updatedAt)} · ${(item.messages || []).length} messages`;
+
+    body.append(title, meta);
+
+    const remove = document.createElement("span");
+    remove.className = "drawer__item-del";
+    remove.setAttribute("role", "button");
+    remove.setAttribute("aria-label", `Delete ${title.textContent}`);
+    remove.title = "Delete conversation";
+    remove.textContent = "×";
+    remove.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteConversation(item.id);
+    });
+
+    button.append(body, remove);
+    button.addEventListener("click", () => openConversation(item.id));
+    els.drawerList.append(button);
+  });
+}
+
+/**
+ * Delete a conversation everywhere it is stored.
+ * @param {string} id - The conversation id
+ */
+async function deleteConversation(id) {
+  delete conversations[id];
+
+  const stored = await chrome.storage.local.get([KEY.chatHistory]);
+  const history = (stored[KEY.chatHistory] || []).filter((entry) => entry.id !== id);
+  await chrome.storage.local.remove([`conversation_${id}`]);
+  await chrome.storage.local.set({ [KEY.chatHistory]: history });
+
+  toast("Conversation deleted", "success");
+  await renderDrawer(els.drawerSearch.value);
+  scheduleSave();
+}
+
+/**
+ * Show shimmer bubbles while a conversation is opened.
+ */
+function showMessageSkeleton() {
+  els.messages.replaceChildren();
+
+  const rows = ["ai", "user", "ai"];
+  for (const [index, side] of rows.entries()) {
+    const row = document.createElement("div");
+    row.className = side === "user" ? "skeleton-row skeleton-row--user" : "skeleton-row";
+    row.style.setProperty("--delay", `${index * 80}ms`);
+
+    const bubble = document.createElement("div");
+    bubble.className = side === "user" ? "skeleton skeleton-bubble skeleton-bubble--user" : "skeleton skeleton-bubble";
+    row.append(bubble);
+    els.messages.append(row);
+  }
+
+  els.emptyState.classList.add("hidden");
+  els.scrollFab.hidden = true;
+}
+
+/**
+ * Switch to another conversation, with a brief loading state.
+ * @param {string} id - The conversation id
+ */
+async function openConversation(id) {
+  if (!conversations[id] || id === activeId) {
+    setDrawer(false);
+    return;
+  }
+
+  stopGeneration();
+  activeId = id;
+  showMessageSkeleton();
+  await new Promise((resolve) => setTimeout(resolve, 220));
+
+  els.chatTitle.textContent = activeConversation().title;
+  renderMessages();
+  updateComposerState();
+  setDrawer(false);
+  scheduleSave();
+  toast(`Opened "${activeConversation().title}"`, "info");
+}
+
+els.openHistory.addEventListener("click", () => setDrawer(!drawerOpen));
+els.drawerClose.addEventListener("click", () => setDrawer(false));
+els.drawerBackdrop.addEventListener("click", () => setDrawer(false));
+els.drawerAll.addEventListener("click", () => openPage("history/history.html"));
+els.drawerSearch.addEventListener("input", () => renderDrawer(els.drawerSearch.value));
+
 /* ================= Navigation ================= */
 
 /**
@@ -1866,7 +2195,6 @@ async function openPage(path) {
   window.close();
 }
 
-els.openHistory.addEventListener("click", () => openPage("history/history.html"));
 els.openSettings.addEventListener("click", () => openPage("settings/settings.html"));
 
 els.newChat.addEventListener("click", () => {
@@ -1882,6 +2210,7 @@ els.newChat.addEventListener("click", () => {
   updateComposerState();
   els.input.focus();
   scheduleSave();
+  toast("New chat started", "success");
 });
 
 /* ================= Incoming quick actions ================= */
@@ -1928,6 +2257,7 @@ function applyIncomingAction(payload) {
   showActionBadge(payload.label || payload.action || "Quick Action");
   els.input.value = prompt;
   updateComposerState();
+  toast(`${payload.label || "Quick action"} ready to send`, "primary", { timeout: 2000 });
 
   clearTimeout(actionTimer);
   actionTimer = setTimeout(() => {
@@ -1959,6 +2289,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
 /* Settings and the popup write the token; keep the overlay in sync without a reload. */
 chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area === "sync" && changes.appearance) {
+    applyTheme(changes.appearance.newValue?.theme || "system");
+    return;
+  }
+
   if (area !== "local") return;
 
   if (TOKEN_KEYS.some((key) => key in changes)) {
@@ -1968,7 +2303,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
     // A sign-out that happened in the settings page or the popup.
     if (wasSignedIn && !signedIn) {
-      showAuthToast("You have been signed out.");
+      toast("You have been signed out.", "warning");
     }
   }
 

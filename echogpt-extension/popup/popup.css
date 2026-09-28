@@ -398,22 +398,39 @@ body {
   border-radius: var(--radius-md);
   background-color: var(--bg-secondary);
   text-align: left;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+  transition: transform var(--press), background-color 160ms ease,
+    border-color 160ms ease, color 160ms ease, box-shadow 200ms ease;
 }
 
 .quick:hover {
   border-color: var(--accent-primary);
   background-color: var(--bg-tertiary);
-  transform: translateY(-1px);
+  color: var(--accent-primary);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--accent-primary) 60%, transparent);
+}
+
+.quick:hover .quick__label {
+  color: var(--accent-primary);
+}
+
+.quick:hover .quick__icon {
+  transform: scale(1.12) rotate(-6deg);
 }
 
 .quick:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.97);
+}
+
+.quick:disabled {
+  opacity: 0.55;
+  transform: none;
 }
 
 .quick__icon {
   font-size: 14px;
   line-height: 1;
+  transition: transform var(--press), filter var(--transition);
 }
 
 .quick__label {
@@ -421,6 +438,7 @@ body {
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.25;
+  transition: color 160ms ease;
 }
 
 /* ===== Recent chats ===== */
