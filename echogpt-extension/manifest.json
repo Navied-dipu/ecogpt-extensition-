@@ -9,6 +9,9 @@
     "sidePanel",
     "scripting"
   ],
+  "host_permissions": [
+    "https://api.echogpt.live/*"
+  ],
   "action": {
     "default_title": "EchoGPT",
     "default_popup": "popup/popup.html",

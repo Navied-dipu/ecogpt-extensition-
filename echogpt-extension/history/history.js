@@ -71,6 +71,23 @@ async function persist() {
   await chrome.storage.local.set({ [KEY]: entries });
 }
 
+/* The sidebar writes new entries as conversations complete; keep the open
+   history panel in sync without a manual refresh. */
+async function reload() {
+  const stored = await chrome.storage.local.get(KEY);
+  entries = Array.isArray(stored[KEY]) ? stored[KEY] : [];
+  render();
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && KEY in changes) reload();
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "CONVERSATION_UPDATED") reload();
+  return false;
+});
+
 els.search.addEventListener("input", render);
 
 els.clearAll.addEventListener("click", async () => {
