@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoGPT History</title>
+    <link rel="stylesheet" href="../styles/common.css" />
+    <link rel="stylesheet" href="history.css" />
+  </head>
+  <body>
+    <div class="history app-shell">
+      <header class="history-header">
+        <h1>History</h1>
+        <div class="header-actions">
+          <input id="search" class="search-input" type="search" placeholder="Search..." />
+          <button id="clearAll" class="btn btn-ghost">Clear</button>
+        </div>
+      </header>
+
+      <main class="history-body">
+        <p id="empty" class="empty text-muted">No conversations yet.</p>
+        <ul id="list" class="history-list"></ul>
+      </main>
+    </div>
+
+    <script src="history.js"></script>
+  </body>
+</html>

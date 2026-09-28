@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoGPT</title>
+    <link rel="stylesheet" href="../styles/common.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="popup app-shell">
+      <header class="popup-header">
+        <div class="brand">
+          <span class="brand-logo">E</span>
+          <h1 class="brand-name">EchoGPT</h1>
+        </div>
+        <button id="themeToggle" class="btn btn-ghost icon-btn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+      </header>
+
+      <main class="popup-body">
+        <section class="card">
+          <h2 class="card-title">Open Sidebar</h2>
+          <p class="card-text">Chat with multiple AI models side by side while you browse.</p>
+          <button id="openSidebar" class="btn btn-primary full-width">Open Sidebar</button>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">New Chat</h2>
+          <textarea id="prompt" class="prompt-input" rows="3" placeholder="Ask anything..."></textarea>
+          <div class="model-row" id="modelRow"></div>
+          <button id="send" class="btn btn-primary full-width">Send to AI</button>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Quick Links</h2>
+          <div class="link-grid">
+            <a class="btn btn-ghost" id="openHistory" href="#">History</a>
+            <a class="btn btn-ghost" id="openSettings" href="#">Settings</a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="popup-footer text-muted">v2.0.0 &middot; Ctrl+Shift+E</footer>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

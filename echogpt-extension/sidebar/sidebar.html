@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoGPT Sidebar</title>
+    <link rel="stylesheet" href="../styles/common.css" />
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+  <body>
+    <div class="sidebar app-shell">
+      <header class="sidebar-header">
+        <div class="brand">
+          <span class="brand-logo">E</span>
+          <h1 class="brand-name">EchoGPT</h1>
+        </div>
+        <div class="header-actions">
+          <button id="newChat" class="btn btn-ghost icon-btn" title="New chat" aria-label="New chat">+</button>
+          <button id="themeToggle" class="btn btn-ghost icon-btn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        </div>
+      </header>
+
+      <nav class="model-tabs" id="modelTabs" aria-label="AI models"></nav>
+
+      <main class="chat-area" id="chatArea" aria-live="polite">
+        <div class="empty-state" id="emptyState">
+          <h2>Ask anything</h2>
+          <p class="text-muted">Select a model above and start chatting. Responses stream in parallel.</p>
+        </div>
+      </main>
+
+      <footer class="composer">
+        <textarea id="input" class="composer-input" rows="2" placeholder="Type a message..."></textarea>
+        <div class="composer-actions">
+          <select id="activeModel" class="composer-select" aria-label="Active model"></select>
+          <button id="send" class="btn btn-primary">Send</button>
+        </div>
+      </footer>
+    </div>
+
+    <script src="sidebar.js"></script>
+  </body>
+</html>
