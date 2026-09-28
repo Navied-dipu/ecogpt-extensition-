@@ -1,6 +1,22 @@
 const HISTORY_KEY = "chatHistory";
 const SETTINGS_KEY = "settings";
 
+const MODEL_LABEL = {
+  "gpt-4o": "GPT-4o",
+  "gemini-pro": "Gemini Pro",
+  "claude-3.5": "Claude 3.5",
+  "llama-3": "Llama 3",
+  mistral: "Mistral"
+};
+
+const MODEL_KEY_SLOT = {
+  "gpt-4o": "chatgpt",
+  "gemini-pro": "gemini",
+  "claude-3.5": "claude",
+  "llama-3": "groq",
+  mistral: "mistral"
+};
+
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.local.set({
     settings: {
@@ -59,13 +75,15 @@ async function broadcastToSidebar(payload) {
 
 async function handleChatRequest({ model, messages }) {
   const { settings } = await chrome.storage.local.get(SETTINGS_KEY);
+  const label = MODEL_LABEL[model] || model;
   const apiKey = await getApiKey(model);
 
   if (!apiKey) {
-    return { text: `No API key configured for ${model}. Add one in Settings.`, error: true };
+    await appendHistory(label, messages);
+    return { text: `No API key configured for **${label}**. Add one in Settings.`, error: true };
   }
 
-  await appendHistory(model, messages);
+  await appendHistory(label, messages);
 
   return {
     model,
@@ -76,7 +94,8 @@ async function handleChatRequest({ model, messages }) {
 
 async function getApiKey(model) {
   const { apiKeys = {} } = await chrome.storage.local.get("apiKeys");
-  return apiKeys[model] || null;
+  const slot = MODEL_KEY_SLOT[model] || model;
+  return apiKeys[model] || apiKeys[slot] || null;
 }
 
 async function appendHistory(model, messages) {
