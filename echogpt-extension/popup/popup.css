@@ -233,6 +233,24 @@ body {
   background: var(--text-muted);
 }
 
+.user__signout {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: transparent;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.user__signout:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.08);
+}
+
 .signin {
   display: flex;
   align-items: center;

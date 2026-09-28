@@ -182,26 +182,7 @@
       </footer>
     </div>
 
-    <!-- Sign-in overlay -->
-    <div class="sign-in-overlay" id="signInOverlay" hidden>
-      <div class="sign-in-card">
-        <div class="sign-in-card__logo">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none">
-            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4v-13.5Z" fill="url(#siGrad)"/>
-            <defs>
-              <linearGradient id="siGrad" x1="0" y1="0" x2="24" y2="24">
-                <stop stop-color="#7c3aed"/>
-                <stop offset="1" stop-color="#2563eb"/>
-              </linearGradient>
-            </defs>
-            <path d="M8.5 7.5h7M8.5 10.5h4.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <h2 class="sign-in-card__title">Sign in to EchoGPT</h2>
-        <p class="sign-in-card__sub">Add your API token in Settings to start chatting with AI models.</p>
-        <button class="btn btn-primary" id="signInBtn" type="button">Go to Settings</button>
-      </div>
-    </div>
+    <!-- Sign-in overlay and toast are injected by sidebar.js -->
 
     <script src="sidebar.js"></script>
   </body>

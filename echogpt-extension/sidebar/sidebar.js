@@ -63,9 +63,7 @@ const els = {
   attachments: document.getElementById("attachments"),
   actionBadge: document.getElementById("actionBadge"),
   actionBadgeLabel: document.getElementById("actionBadgeLabel"),
-  tokenCounter: document.getElementById("tokenCounter"),
-  signInOverlay: document.getElementById("signInOverlay"),
-  signInBtn: document.getElementById("signInBtn")
+  tokenCounter: document.getElementById("tokenCounter")
 };
 
 let conversations = {};
@@ -82,6 +80,7 @@ let requestTimeoutMs = DEFAULT_TIMEOUT_MS;
 let authToken = null;
 let signedIn = false;
 let activeController = null;
+let currentUser = null;
 
 const modelById = (id) => MODELS.find((m) => m.id === id) || MODELS[0];
 
@@ -218,9 +217,457 @@ async function clearAuthToken() {
  */
 function updateSignInState() {
   signedIn = Boolean(authToken);
-  if (els.signInOverlay) els.signInOverlay.hidden = signedIn;
+  setAuthOverlay(!signedIn);
   if (els.input) els.input.disabled = !signedIn;
   updateSendState();
+}
+
+/* ================= Authentication ================= */
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MIN_PASSWORD_LENGTH = 6;
+const AUTH_ERROR_CLEAR_MS = 4000;
+const OVERLAY_FADE_MS = 220;
+const GOOGLE_LOGIN_URL = "https://api.echogpt.live/signup";
+const FORGOT_PASSWORD_URL = "https://api.echogpt.live/forgot-password";
+
+const AUTH_ERRORS = {
+  "invalid-credentials": "Invalid email or password",
+  network: "Connection failed. Check your internet.",
+  "not-found": "No account found. Sign Up?",
+  "rate-limit": "Too many attempts. Wait a moment.",
+  server: "Sign-in service is unavailable. Try again.",
+  timeout: "The request timed out. Try again.",
+  cancelled: "Sign in was cancelled.",
+  oauth: "Google sign-in failed. Try again.",
+  unknown: "Sign in failed. Try again."
+};
+
+const VALIDATION_ERRORS = {
+  email: "Enter a valid email address",
+  password: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+};
+
+const GOOGLE_ICON =
+  '<svg viewBox="0 0 48 48" width="16" height="16" aria-hidden="true">' +
+  '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>' +
+  '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>' +
+  '<path fill="#FBBC05" d="M10.53 28.59A13 13 0 0 1 9.77 24c0-1.6.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>' +
+  '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>' +
+  "</svg>";
+
+const LOGO_ICON =
+  '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" aria-hidden="true">' +
+  '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4v-13.5Z" fill="#ffffff"/>' +
+  '<path d="M8.5 7.5h7M8.5 10.5h4.5" stroke="#7c3aed" stroke-width="1.6" stroke-linecap="round"/>' +
+  "</svg>";
+
+/** Cached references into the injected sign-in overlay. */
+const auth = {
+  root: null,
+  card: null,
+  form: null,
+  email: null,
+  password: null,
+  submit: null,
+  google: null,
+  loading: null,
+  toast: null,
+  busy: false,
+  errorTimer: null
+};
+
+/**
+ * Build and attach the sign-in overlay and toast to the sidebar document.
+ * Called once at startup; every element is cached on the `auth` object.
+ */
+function injectAuthUi() {
+  const overlay = document.createElement("div");
+  overlay.className = "auth-overlay";
+  overlay.id = "authOverlay";
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="auth-card__logo">${LOGO_ICON}</div>
+      <h2 class="auth-card__title" id="authTitle">Welcome to EchoGPT</h2>
+      <p class="auth-card__sub">Sign in to start chatting with AI</p>
+
+      <button class="auth-google" id="authGoogle" type="button">${GOOGLE_ICON}<span>Sign in with Google</span></button>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <form class="auth-form" id="authForm" novalidate>
+        <label class="auth-field" for="authEmail">
+          <span class="auth-field__label">Email</span>
+          <input class="auth-input" id="authEmail" name="email" type="email" inputmode="email"
+            autocomplete="email" placeholder="you@example.com" spellcheck="false" />
+        </label>
+        <p class="auth-error auth-error--field" id="authEmailError" role="alert" hidden></p>
+
+        <label class="auth-field" for="authPassword">
+          <span class="auth-field__label">Password</span>
+          <input class="auth-input" id="authPassword" name="password" type="password"
+            autocomplete="current-password" placeholder="At least ${MIN_PASSWORD_LENGTH} characters" />
+        </label>
+        <p class="auth-error auth-error--field" id="authPasswordError" role="alert" hidden></p>
+
+        <p class="auth-error auth-error--form" id="authFormError" role="alert" hidden></p>
+
+        <button class="auth-submit" id="authSubmit" type="submit" disabled>Sign In</button>
+        <button class="auth-link" id="authForgot" type="button">Forgot password?</button>
+
+        <div class="auth-rule"></div>
+
+        <button class="auth-link" id="authSignUp" type="button">
+          Don&rsquo;t have an account? <span>Sign Up</span>
+        </button>
+      </form>
+
+      <div class="auth-loading" id="authLoading" hidden>
+        <span class="auth-loading__spinner" aria-hidden="true"></span>
+        <span>Signing you in&hellip;</span>
+      </div>
+    </div>`;
+
+  const toast = document.createElement("div");
+  toast.className = "auth-toast";
+  toast.id = "authToast";
+  toast.setAttribute("role", "status");
+  toast.hidden = true;
+
+  document.body.append(overlay, toast);
+
+  auth.root = overlay;
+  auth.card = overlay.querySelector(".auth-card");
+  auth.form = overlay.querySelector("#authForm");
+  auth.email = overlay.querySelector("#authEmail");
+  auth.password = overlay.querySelector("#authPassword");
+  auth.submit = overlay.querySelector("#authSubmit");
+  auth.google = overlay.querySelector("#authGoogle");
+  auth.loading = overlay.querySelector("#authLoading");
+  auth.toast = toast;
+
+  auth.google.addEventListener("click", signInWithGoogle);
+  auth.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitPasswordSignIn();
+  });
+
+  for (const input of [auth.email, auth.password]) {
+    input.addEventListener("input", () => {
+      clearFieldError(input);
+      clearAuthError();
+      validateAuthForm();
+    });
+  }
+
+  overlay.querySelector("#authForgot").addEventListener("click", () => openExternal(FORGOT_PASSWORD_URL));
+  overlay.querySelector("#authSignUp").addEventListener("click", () => openExternal(GOOGLE_LOGIN_URL));
+}
+
+/**
+ * Open an external URL in a new tab.
+ * @param {string} url - The target URL
+ */
+function openExternal(url) {
+  chrome.tabs.create({ url }).catch(() => {});
+}
+
+/**
+ * Show or hide the sign-in overlay.
+ * @param {boolean} visible - Whether the overlay should be shown
+ * @param {boolean} [animate] - Fade the overlay out when hiding
+ */
+function setAuthOverlay(visible, animate = true) {
+  if (!auth.root) return;
+
+  if (visible) {
+    auth.root.hidden = false;
+    auth.root.classList.remove("is-leaving");
+    return;
+  }
+
+  if (!animate) {
+    auth.root.hidden = true;
+    return;
+  }
+
+  auth.root.classList.add("is-leaving");
+  setTimeout(() => {
+    auth.root.hidden = true;
+    auth.root.classList.remove("is-leaving");
+  }, OVERLAY_FADE_MS);
+}
+
+/**
+ * Show a transient toast in the sidebar.
+ * @param {string} text - The message to show
+ */
+function showAuthToast(text) {
+  if (!auth.toast) return;
+
+  clearTimeout(auth.toastTimer);
+  auth.toast.textContent = text;
+  auth.toast.hidden = false;
+  auth.toast.classList.add("is-visible");
+
+  auth.toastTimer = setTimeout(() => {
+    auth.toast.classList.remove("is-visible");
+    auth.toast.hidden = true;
+  }, 3200);
+}
+
+/**
+ * Show a validation error under a single field.
+ * @param {HTMLElement} input - The field input
+ * @param {string} message - The error message
+ */
+function showFieldError(input, message) {
+  const node = input.closest(".auth-field")?.nextElementSibling;
+  if (!node?.classList.contains("auth-error")) return;
+
+  input.classList.add("is-invalid");
+  node.textContent = message;
+  node.hidden = false;
+}
+
+/**
+ * Clear the validation error under a single field.
+ * @param {HTMLElement} input - The field input
+ */
+function clearFieldError(input) {
+  const node = input.closest(".auth-field")?.nextElementSibling;
+  input.classList.remove("is-invalid");
+  if (node?.classList.contains("auth-error")) node.hidden = true;
+}
+
+/**
+ * Show a form-level auth error; it clears itself after 4 seconds.
+ * @param {string} message - The error message
+ */
+function setAuthError(message) {
+  const node = auth.form?.querySelector("#authFormError");
+  if (!node) return;
+
+  clearTimeout(auth.errorTimer);
+  if (!message) {
+    node.hidden = true;
+    node.textContent = "";
+    return;
+  }
+
+  node.textContent = message;
+  node.hidden = false;
+  auth.errorTimer = setTimeout(() => {
+    node.hidden = true;
+    node.textContent = "";
+  }, AUTH_ERROR_CLEAR_MS);
+}
+
+/**
+ * Clear the form-level auth error immediately.
+ */
+function clearAuthError() {
+  clearTimeout(auth.errorTimer);
+  const node = auth.form?.querySelector("#authFormError");
+  if (!node) return;
+  node.hidden = true;
+  node.textContent = "";
+}
+
+/**
+ * Validate the email field.
+ * @param {string} value - The current value
+ * @returns {boolean} True when the value looks like an email address
+ */
+function isValidEmail(value) {
+  return EMAIL_PATTERN.test(String(value || "").trim());
+}
+
+/**
+ * Validate the password field.
+ * @param {string} value - The current value
+ * @returns {boolean} True when the password is long enough
+ */
+function isValidPassword(value) {
+  return String(value || "").length >= MIN_PASSWORD_LENGTH;
+}
+
+/**
+ * Validate the sign-in form and toggle the submit button.
+ * @param {boolean} [showErrors] - Also surface field errors
+ * @returns {boolean} True when both fields are valid
+ */
+function validateAuthForm(showErrors = false) {
+  const emailOk = isValidEmail(auth.email?.value);
+  const passwordOk = isValidPassword(auth.password?.value);
+
+  if (showErrors) {
+    if (emailOk) clearFieldError(auth.email);
+    else showFieldError(auth.email, VALIDATION_ERRORS.email);
+
+    if (passwordOk) clearFieldError(auth.password);
+    else showFieldError(auth.password, VALIDATION_ERRORS.password);
+  }
+
+  if (auth.submit) auth.submit.disabled = auth.busy || !emailOk || !passwordOk;
+  return emailOk && passwordOk;
+}
+
+/**
+ * Enable or disable every control in the overlay while a request is running.
+ * @param {boolean} busy - True while authenticating
+ */
+function setAuthBusy(busy) {
+  auth.busy = busy;
+  if (auth.loading) auth.loading.hidden = !busy;
+  if (auth.card) auth.card.classList.toggle("is-busy", busy);
+
+  for (const control of auth.form?.querySelectorAll("input, button") || []) {
+    control.disabled = busy;
+  }
+  if (auth.google) auth.google.disabled = busy;
+
+  validateAuthForm();
+}
+
+/**
+ * Handle the result of a background auth call.
+ * @param {Object} response - The runtime message response
+ * @returns {Promise<boolean>} True when sign-in succeeded
+ */
+async function consumeAuthResponse(response) {
+  if (response?.ok) {
+    await handleAuthSuccess(response.user);
+    return true;
+  }
+
+  setAuthError(AUTH_ERRORS[response?.code] || AUTH_ERRORS.unknown);
+  return false;
+}
+
+/**
+ * Sign in with the email and password currently in the form.
+ * @returns {Promise<boolean>} True when sign-in succeeded
+ */
+async function submitPasswordSignIn() {
+  if (auth.busy) return false;
+  if (!validateAuthForm(true)) return false;
+
+  setAuthError("");
+  setAuthBusy(true);
+
+  try {
+    return await consumeAuthResponse(
+      await chrome.runtime.sendMessage({
+        type: "AUTH_LOGIN",
+        payload: { email: auth.email.value.trim(), password: auth.password.value }
+      })
+    );
+  } catch {
+    setAuthError(AUTH_ERRORS.network);
+    return false;
+  } finally {
+    setAuthBusy(false);
+    auth.password.value = "";
+  }
+}
+
+/**
+ * Sign in with Google through the background OAuth flow.
+ * @returns {Promise<boolean>} True when sign-in succeeded
+ */
+async function signInWithGoogle() {
+  if (auth.busy) return false;
+
+  setAuthError("");
+  setAuthBusy(true);
+
+  try {
+    return await consumeAuthResponse(
+      await chrome.runtime.sendMessage({ type: "AUTH_GOOGLE" })
+    );
+  } catch {
+    setAuthError(AUTH_ERRORS.network);
+    return false;
+  } finally {
+    setAuthBusy(false);
+  }
+}
+
+/**
+ * Apply a freshly authenticated session: store the profile, reveal the chat, toast.
+ * @param {Object} user - The user record {name, email, avatar, plan, token}
+ * @returns {Promise<void>} Resolves once the UI is updated
+ */
+async function handleAuthSuccess(user) {
+  currentUser = user || null;
+  authToken = user?.token || (await readAuthToken());
+
+  if (user) {
+    await chrome.storage.local.set({ user: { ...user, token: authToken } });
+  }
+
+  setAuthOverlay(false);
+  updateSignInState();
+  showAuthToast(`Welcome back, ${displayName(user)}! 👋`);
+}
+
+/**
+ * Resolve a friendly display name from a user record.
+ * @param {Object} user - The user record
+ * @returns {string} The display name
+ */
+function displayName(user) {
+  const name = String(user?.name || "").trim();
+  if (name) return name;
+  const email = String(user?.email || "").trim();
+  return email ? email.split("@")[0] : "there";
+}
+
+/**
+ * Verify the stored token on startup and show the overlay when it is missing or stale.
+ * @returns {Promise<boolean>} True when the user is signed in
+ */
+async function checkAuthState() {
+  const token = await readAuthToken();
+  if (!token) {
+    updateSignInState();
+    return false;
+  }
+
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: "AUTH_VERIFY",
+      payload: { token }
+    });
+
+    if (result?.valid && result.user) {
+      currentUser = result.user;
+      authToken = result.user.token || token;
+    } else if (result?.valid === false) {
+      authToken = null;
+    }
+  } catch {
+    // Background unreachable (or offline): trust the stored token.
+  }
+
+  if (!authToken) {
+    await chrome.storage.local.remove(TOKEN_KEYS);
+  }
+
+  updateSignInState();
+  return Boolean(authToken);
+}
+
+/**
+ * Reset the local session after a sign-out broadcast.
+ */
+function applySignedOut() {
+  authToken = null;
+  currentUser = null;
+  setAuthOverlay(true, false);
+  updateSignInState();
 }
 
 /**
@@ -255,8 +702,7 @@ async function loadState() {
   els.contextToggle.setAttribute("aria-pressed", String(includePageContext));
   els.chatTitle.textContent = activeConversation().title;
 
-  await Promise.all([readApiEndpoint(), readAuthToken()]);
-  updateSignInState();
+  await readApiEndpoint();
 }
 
 /**
@@ -839,7 +1285,14 @@ function buildErrorCard(msg) {
     signIn.type = "button";
     signIn.className = "msg__error-btn";
     signIn.textContent = "Sign in";
-    signIn.addEventListener("click", () => openPage("settings/settings.html"));
+    signIn.addEventListener("click", () => {
+      if (authToken) {
+        openPage("settings/settings.html");
+        return;
+      }
+      setAuthOverlay(true);
+      auth.email?.focus();
+    });
     actions.append(signIn);
   } else {
     actions.append(retry);
@@ -1050,11 +1503,12 @@ function buildPrompt(text) {
 
 /**
  * Collect prior turns in API format, skipping failed and empty messages.
+ * @param {string} [excludeId] - Message id to leave out (it is sent separately)
  * @returns {Array<{role: string, content: string}>} Conversation history
  */
-function buildHistory() {
+function buildHistory(excludeId) {
   return activeConversation()
-    .messages.filter((msg) => !msg.error && msg.text)
+    .messages.filter((msg) => !msg.error && msg.text && msg.id !== excludeId)
     .map((msg) => ({ role: msg.role === "user" ? "user" : "assistant", content: msg.text }));
 }
 
@@ -1112,7 +1566,8 @@ async function runCompletion() {
   if (!lastUser) return;
 
   const model = conversation.model || activeModel;
-  const history = buildHistory();
+  // sendMessage appends the latest user turn itself, so it must not be in the history.
+  const history = buildHistory(lastUser.id);
 
   abortRequested = false;
   setStatus("loading");
@@ -1413,7 +1868,6 @@ async function openPage(path) {
 
 els.openHistory.addEventListener("click", () => openPage("history/history.html"));
 els.openSettings.addEventListener("click", () => openPage("settings/settings.html"));
-els.signInBtn.addEventListener("click", () => openPage("settings/settings.html"));
 
 els.newChat.addEventListener("click", () => {
   stopGeneration();
@@ -1489,17 +1943,39 @@ chrome.runtime.onMessage.addListener((message) => {
     applyIncomingAction(message.payload);
     return false;
   }
+
+  if (message?.type === "AUTH_SUCCESS") {
+    handleAuthSuccess(message.payload);
+    return false;
+  }
+
+  if (message?.type === "AUTH_SIGNED_OUT") {
+    applySignedOut();
+    return false;
+  }
+
   return false;
 });
 
-/* Settings writes the token; keep the overlay in sync without a reload. */
+/* Settings and the popup write the token; keep the overlay in sync without a reload. */
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local") return;
 
   if (TOKEN_KEYS.some((key) => key in changes)) {
+    const wasSignedIn = signedIn;
     await readAuthToken();
     updateSignInState();
+
+    // A sign-out that happened in the settings page or the popup.
+    if (wasSignedIn && !signedIn) {
+      showAuthToast("You have been signed out.");
+    }
   }
+
+  if ("user" in changes) {
+    currentUser = changes.user.newValue || null;
+  }
+
   if (KEY.apiEndpoint in changes) {
     await readApiEndpoint();
   }
@@ -1508,9 +1984,11 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 /* ================= Init ================= */
 
 /**
- * Boot the sidebar: restore state, render, and announce readiness to the background.
+ * Boot the sidebar: inject the auth UI, restore state, verify the session, render.
  */
 async function init() {
+  injectAuthUi();
+
   await loadState();
   renderModelBar();
   renderMessages();
@@ -1523,6 +2001,9 @@ async function init() {
   } catch {
     /* background not ready */
   }
+
+  await checkAuthState();
+  validateAuthForm();
 }
 
 init();

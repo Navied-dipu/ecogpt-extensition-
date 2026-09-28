@@ -12,6 +12,7 @@ const els = {
   userName: document.getElementById("userName"),
   userEmail: document.getElementById("userEmail"),
   userPlan: document.getElementById("userPlan"),
+  signOut: document.getElementById("signOut"),
   statModels: document.getElementById("statModels"),
   statDelay: document.getElementById("statDelay"),
   chats: document.getElementById("chats"),
@@ -87,8 +88,28 @@ els.rateLink.addEventListener("click", (e) => {
 });
 
 els.signIn.addEventListener("click", async () => {
-  await openExternal("https://echogpt.app/login?source=extension");
+  // The sidebar owns the sign-in flow (overlay, OAuth, email form).
+  const opened = await openSidePanel();
+  if (!opened) await openExternal("https://echogpt.app/login?source=extension");
+  window.close();
 });
+
+/**
+ * Clear the session and return to the signed-out state.
+ * @returns {Promise<void>} Resolves once storage is cleared and the UI updated
+ */
+async function signOut() {
+  els.signOut.disabled = true;
+
+  try {
+    await chrome.runtime.sendMessage({ type: "AUTH_SIGN_OUT" });
+  } catch {
+    await chrome.storage.local.remove(["authToken", "apiKey", "apiKeys", "user"]);
+  }
+
+  els.signOut.disabled = false;
+  await renderAuth();
+}
 
 /* ---------- Sidebar ---------- */
 
@@ -212,24 +233,44 @@ function renderChats(history) {
 
 /* ---------- User ---------- */
 
-function renderUser(user) {
-  const signedIn = Boolean(user?.email || user?.name);
+/**
+ * Render the account block from the stored session.
+ * @returns {Promise<boolean>} True when a user is signed in
+ */
+async function renderAuth() {
+  const { user } = await chrome.storage.local.get("user");
+  const signedIn = Boolean(user);
 
   els.userBlock.hidden = !signedIn;
   els.signIn.style.display = signedIn ? "none" : "flex";
   els.signIn.hidden = signedIn;
+  if (!signedIn) return false;
 
-  if (!signedIn) return;
+  const name = String(user.name || user.email?.split("@")[0] || "EchoGPT User");
+  const plan = String(user.plan || "free").toLowerCase() === "pro" ? "Pro" : "Free";
 
-  const name = user.name || user.email.split("@")[0];
-  const plan = user.plan === "pro" || user.plan === "Pro" ? "Pro" : "Free";
-
-  els.userAvatar.textContent = name.charAt(0).toUpperCase();
+  els.userAvatar.textContent = user.avatar ? "" : name.charAt(0).toUpperCase();
+  els.userAvatar.style.backgroundImage = user.avatar ? `url(${JSON.stringify(user.avatar)})` : "";
+  els.userAvatar.style.backgroundSize = user.avatar ? "cover" : "";
   els.userName.textContent = name;
   els.userEmail.textContent = user.email || "";
   els.userPlan.textContent = plan;
   els.userPlan.dataset.plan = plan;
+
+  return true;
 }
+
+els.signOut.addEventListener("click", signOut);
+
+/* Keep the popup in sync while it is open. */
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && ("user" in changes || "authToken" in changes)) renderAuth();
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "AUTH_SUCCESS" || message?.type === "AUTH_SIGNED_OUT") renderAuth();
+  return false;
+});
 
 /* ---------- Latency stat ---------- */
 
@@ -248,7 +289,6 @@ async function measureDelay() {
 async function init() {
   const stored = await chrome.storage.local.get([
     "theme",
-    "user",
     "enabled",
     HISTORY_KEY
   ]);
@@ -260,7 +300,7 @@ async function init() {
     : DEFAULT_MODELS;
   els.statModels.textContent = String(models.length);
 
-  renderUser(stored.user);
+  await renderAuth();
   renderChats(stored[HISTORY_KEY]);
 
   els.statDelay.textContent = `${await measureDelay()}ms`;

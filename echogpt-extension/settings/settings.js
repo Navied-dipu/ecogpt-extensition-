@@ -511,7 +511,17 @@ els.signOut.addEventListener("click", async () => {
   });
   if (!ok) return;
 
+  // Clear the account session so the sidebar and popup show the sign-in overlay again.
+  try {
+    await chrome.runtime.sendMessage({ type: "AUTH_SIGN_OUT" });
+  } catch {
+    await chrome.storage.local.remove(["authToken", "apiKey", "apiKeys", "user"]);
+  }
+
   state.account = { ...DEFAULTS.account, name: "", email: "", plan: "free" };
+  // save() mirrors the API key locally; clear it too so the sign-out sticks.
+  apiKeyValue = "";
+  els.apiKey.value = "";
   renderAccount();
   await save();
   showToast("Signed out", "ok");
